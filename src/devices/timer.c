@@ -30,6 +30,9 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/*initialize lock */
+struct lock lock;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -95,9 +98,11 @@ timer_sleep (int64_t ticks)
   // while (timer_elapsed (start) < ticks) 
   // thread_yield ();
   /* Implement lock */
-  struct *lock;
-  lock_init(lock);
-  
+  //struct *lock;
+  //lock_init(lock);
+  lock_acquire(&lock);
+  // wait
+  lock_release(&lock);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
