@@ -31,14 +31,24 @@ static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
 /*initialize lock */
-struct lock*lock;
+//struct lock*lock;
 
 /* list of processes in THREAD_READY state */
-static struct list ready_list;
+struct list thread_list;
 
+/* comparator function */
+bool less_val(const struct list_elem *a, const struct list_elem *b) {
+  struct thread *tempA;
+  struct thread *tempB;
+
+  tempA = list_entry(a, struct thread, elem);
+  tempB = list_entry(b, struct thread, elem);
+
+  return tempA->sleep_ticks < tempB->sleep_ticks;
+}
 /* List of all processes. Processes are added to this list
  * when they are first schedule and removed upon exist. */
-static struct list all_list;
+//static struct list all_list;
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -101,24 +111,25 @@ timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
   struct thread *t = thread_current();
-  enum intr_level old_level;
 
   /* initialize the lists*/
-  list_init(&ready_list);
-  list_init(&all_list);
+  //list_init(&ready_list);
+  //list_init(&all_list);
 
   ASSERT (intr_get_level () == INTR_ON);
-  lock_init(&lock);
+  //lock_init(&lock);
   // thread_yield ();
-  old_level = intr_disable();
-  lock_acquire(&lock);
-  list_push_back(&ready_list, &t->elem);
+  t->sleep_ticks = start + ticks;
+  //lock_acquire(&lock);
+  //list_push_back(&ready_list, &t->elem);
   t->status = THREAD_READY;
   /*while (timer_elapsed(start) < ticks) {*/
   
-  intr_set_level(old_level);
+  intr_disable();
+  list_insert_ordered(&thread_list,&t->elem, less_val, NULL);
+  thread_block();
   intr_enable();
-  lock_release(&lock);
+  //lock_release(&lock);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
