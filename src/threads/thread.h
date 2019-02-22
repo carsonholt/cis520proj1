@@ -93,6 +93,35 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    /* Code added here -------------------------------------------------------------*/
+    /*
+     * This is for the priority scheduling.
+     */
+    
+    /*
+     * hold_lock is for the lock related to thread.
+     * holder is for the current thread.
+     * wait_on_lock is for deal with the priority donation.
+     */
+    struct lock *wait_on_lock;
+    
+    /*
+     * I use waiters in semaphore to control every threads related to lock,
+     * but it make control thread really difficult. 
+     */
+    struct list donation_list;
+    
+    /*
+     * for the elements in donation_list
+     */
+    struct list_elem donation_list_elem;
+    
+    /*
+     * for thread_set_priority(), like a cach
+     */
+    int init_priority;
+    /* Code Ends */
+    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -137,5 +166,17 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* Code added here -------------------------------------------------------------*/
+void test_yield(void); /* Test the current thread whether should out of CPU or not*/
+
+void update_priority (void); /* Update the thread priority */
+
+void donate_priority(void); /* Donate the priority (priority inheritance) */
+
+void lock_remove (struct lock *lock); /* Remove lock from donation_list */
+
+bool change_priority (const struct list_elem *a, const struct list_elem *b, void *aux); /* change priority */
+/* Code Ends */
 
 #endif /* threads/thread.h */
