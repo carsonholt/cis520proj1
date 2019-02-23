@@ -121,7 +121,14 @@ timer_sleep (int64_t ticks)
 
   ASSERT (intr_get_level () == INTR_ON);
   
-  thread_sleep(ticks);
+  intr_disable();
+  t->load_avg = wakeup_time;
+
+  list_push_back(&thread_list, &t->elem);
+
+  thread_unblock(t);
+
+  intr_enable();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be

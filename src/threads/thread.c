@@ -39,6 +39,7 @@ static struct lock tid_lock;
 
 /* Code added here -------------------------------------------------------------*/
 int64_t load_avg; //load average
+static struct list block_list;
 /* Code Ends */
 
 /* Stack frame for kernel_thread(). */
@@ -101,6 +102,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&block_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -159,7 +161,7 @@ thread_print_stats (void)
 /* Code added here -------------------------------------------------------------*/
 //put thread to sleep for avoid busy waiting
 //in timer_sleep() in timer.c
-void thread_sleep (int64_t sleepticks)
+/*void thread_sleep (int64_t sleepticks)
 {
     struct thread *current = thread_current();
     enum intr_level old_level;
@@ -171,9 +173,9 @@ void thread_sleep (int64_t sleepticks)
     {
         load_avg = timer_ticks() + sleepticks;
         current -> status = THREAD_BLOCKED;
-        list_insert_ordered(&all_list, &current -> elem, thread_create, NULL);
+        list_insert_ordered(&block_list, &current -> elem, thread_compare, NULL);
     }
-}
+}*/
 
 //wake up non-busy threads
 void thread_wake ()
