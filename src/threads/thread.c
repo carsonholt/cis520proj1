@@ -169,9 +169,9 @@ void thread_sleep (int64_t sleepticks)
     
     if (current != idle_thread)
     {
-        current -> sleep_ticks = timer_ticks() + sleepticks;
+        load_avg = timer_ticks() + sleepticks;
         current -> status = THREAD_BLOCKED;
-        list_insert_ordered(&block_list, &cur -> elem, thread_compare, NULL);
+        list_insert_ordered(&all_list, &current -> elem, thread_create, NULL);
     }
 }
 
@@ -182,10 +182,10 @@ void thread_wake ()
     enum intr_level old_level;
     old_level = intr_disable();
     struct thread *th;
-    for(n = list_begin(&block_list); n != list_end(&block_list); )
+    for(n = list_begin(&all_list); n != list_end(&all_list); )
     {
         th = list_entry(n, struct thread, elem);
-        if(timer_ticks() >= th -> sleep_ticks)
+        if(timer_ticks() >= load_avg)
         {
             m = list_remove(n);
             th = list_entry(n, struct thread, elem);

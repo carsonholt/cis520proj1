@@ -199,18 +199,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
-
-  struct list_elem *e;
-  for (e = list_begin(&thread_list); e != list_end(&thread_list); e = list_next(e))
-  {
-    struct thread *t list_entry (e, struct thread, load_avg);
-    if (t->load_avg <= timer_ticks())
-    {
-      thread_unblock(&t);
-      list_remove(&t->load_avg);
-    }
-  }
+  thread_tick();
 }
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
