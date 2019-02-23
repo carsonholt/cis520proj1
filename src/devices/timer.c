@@ -30,22 +30,24 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
-/*initialize lock */
-//struct lock*lock;
+/*initialize compartor function */
+//static bool less_value(struct list_elem *a, struct list_elem *b);
 
 /* list of processes in THREAD_READY state */
 struct list thread_list;
+struct list ready_list;
 
 /* comparator function */
-bool less_val(const struct list_elem *a, const struct list_elem *b) {
-  struct thread *tempA;
-  struct thread *tempB;
+/*bool 
+less_value(const struct list_elem *a, const struct list_elem *b) {
+  struct thread *temp_a;
+  struct thread *temp_b;
 
-  tempA = list_entry(a, struct thread, elem);
-  tempB = list_entry(b, struct thread, elem);
+  temp_a = list_entry(a, struct thread, elem);
+  temp_b = list_entry(b, struct thread, elem);
 
-  return tempA->sleep_ticks < tempB->sleep_ticks;
-}
+  return temp_a->sleep_time < temp_b->sleep_time;
+}*/
 /* List of all processes. Processes are added to this list
  * when they are first schedule and removed upon exist. */
 //static struct list all_list;
@@ -57,6 +59,10 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+
+  /* initialize lists */
+  list_init(&thread_list);
+  list_init(&ready_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -109,27 +115,13 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
   struct thread *t = thread_current();
-
-  /* initialize the lists*/
-  //list_init(&ready_list);
-  //list_init(&all_list);
+  int64_t start = timer_ticks ();
+  int64_t wakeup_time = start + ticks;
 
   ASSERT (intr_get_level () == INTR_ON);
-  //lock_init(&lock);
-  // thread_yield ();
-  t->sleep_ticks = start + ticks;
-  //lock_acquire(&lock);
-  //list_push_back(&ready_list, &t->elem);
-  t->status = THREAD_READY;
-  /*while (timer_elapsed(start) < ticks) {*/
   
-  intr_disable();
-  list_insert_ordered(&thread_list,&t->elem, less_val, NULL);
-  thread_block();
-  intr_enable();
-  //lock_release(&lock);
+  thread_sleep(ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -201,15 +193,25 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-}
 
+  struct list_elem *e;
+  for (e = list_begin(&thread_list); e != list_end(&thread_list); e = list_next(e))
+  {
+    struct thread *t list_entry (e, struct thread, load_avg);
+    if (t->load_avg <= timer_ticks())
+    {
+      thread_unblock(&t);
+      list_remove(&t->load_avg);
+    }
+  }
+}
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
 static bool
