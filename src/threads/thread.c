@@ -37,6 +37,10 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+/* Code added here -------------------------------------------------------------*/
+int64_t load_avg; //load average
+/* Code Ends */
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
   {
@@ -151,6 +155,49 @@ thread_print_stats (void)
   printf ("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
           idle_ticks, kernel_ticks, user_ticks);
 }
+
+/* Code added here -------------------------------------------------------------*/
+//put thread to sleep for avoid busy waiting
+//in timer_sleep() in timer.c
+void thread_sleep (int64_t sleepticks)
+{
+    struct thread *current = thread_current();
+    enum intr_level old_level;
+    
+    ASSERT(!intr_context());
+    old_level = intr_disable();
+    
+    if (current != idle_thread)
+    {
+        current -> sleep_ticks = timer_ticks() + sleepticks;
+        current -> status = THREAD_BLOCKED;
+        list_insert_ordered(&block_list, &cur -> elem, thread_compare, NULL);
+    }
+}
+
+//wake up non-busy threads
+void thread_wake ()
+{
+    struct list_elem *n, *m;
+    enum intr_level old_level;
+    old_level = intr_disable();
+    struct thread *th;
+    for(n = list_begin(&block_list); n != list_end(&block_list); )
+    {
+        th = list_entry(n, struct thread, elem);
+        if(timer_ticks() >= th -> sleep_ticks)
+        {
+            m = list_remove(n);
+            th = list_entry(n, struct thread, elem);
+            thread_unblock(th);
+            n = m;
+        }
+        else break;
+    }
+    intr_set_level(old_level);
+}
+/* Code Ends */
+
 
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,

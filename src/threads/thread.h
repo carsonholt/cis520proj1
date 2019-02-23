@@ -177,6 +177,8 @@ void donate_priority(void); /* Donate the priority (priority inheritance) */
 void lock_remove (struct lock *lock); /* Remove lock from donation_list */
 
 bool change_priority (const struct list_elem *a, const struct list_elem *b, void *aux); /* change priority */
+void thread_sleep (int64_t);
+void thread_wake (void);
 /* Code Ends */
 
 #endif /* threads/thread.h */
