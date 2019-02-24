@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include <threads/synch.h>
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -95,6 +95,13 @@ struct thread
 
     /* Code added here -------------------------------------------------------------*/
     /*
+     * For the wakeup time
+     */
+    struct semaphore sema; //empty semaphore
+
+    int64_t wakeup;
+
+    /*
      * This is for the priority scheduling.
      */
     
@@ -120,6 +127,7 @@ struct thread
      * for thread_set_priority(), like a cach
      */
     int init_priority;
+
     /* Code Ends */
     
 #ifdef USERPROG
