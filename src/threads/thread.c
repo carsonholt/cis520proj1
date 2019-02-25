@@ -623,7 +623,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t -> wait_on_lock = NULL;
   list_init(&t -> donation_list);
   t -> init_priority = priority;
-
+  
+  sema_init(&t->sema, 0); //Initialize semaphore
   list_push_back(&all_list, &t -> allelem);
   /* Code Ends */
 }

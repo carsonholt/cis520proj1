@@ -111,7 +111,7 @@ timer_elapsed (int64_t then)
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
+   be turned on. (Modified) */
 void
 timer_sleep (int64_t ticks) 
 {
@@ -130,10 +130,8 @@ timer_sleep (int64_t ticks)
   //printf("wakeup at:%i\n", wakeup_time); //debug
   list_push_back(&thread_list, &t->elem);
   //printf("element pushed back\n");
-  //sema_down(&t->sema);
-  //printf("semaphore down\n");
-  thread_block();
-  //printf("thread blocked\n");
+  sema_down(&t->sema);
+  printf("semaphore down\n");
   intr_enable();
 }
 
@@ -213,7 +211,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   //thread_wake();
-  //thread_tick();
+  thread_tick();
 
   struct list_elem *e, *f;
   enum intr_level old_level;
@@ -224,16 +222,17 @@ timer_interrupt (struct intr_frame *args UNUSED)
      t = list_entry (e, struct thread, elem);
      if (t->wakeup <= timer_ticks())
      {
-	f = list_remove(e);
+	//f = list_remove(e);
 	t = list_entry(e, struct thread, elem);
-	thread_unblock(t);
-	e = f;
-	printf("unblock\n");
+	sema_up(&t->sema);
+	//e = f;
+	f = list_remove(e);
+	e=f;
      }
      else break;
   }
   intr_set_level(old_level);
-  thread_tick();
+  //thread_tick();
 }
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
