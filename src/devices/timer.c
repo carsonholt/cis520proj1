@@ -131,7 +131,8 @@ timer_sleep (int64_t ticks)
   list_push_back(&thread_list, &t->elem);
   //printf("element pushed back\n");
   sema_down(&t->sema);
-  printf("semaphore down\n");
+  //printf("semaphore down\n");
+  //sema_up(&t->sema);
   intr_enable();
 }
 
@@ -219,15 +220,18 @@ timer_interrupt (struct intr_frame *args UNUSED)
   struct thread *t;
   for (e = list_begin(&thread_list); e != list_end(&thread_list);) 
   {
-     t = list_entry (e, struct thread, elem);
+     t = list_entry(e, struct thread, elem);
      if (t->wakeup <= timer_ticks())
      {
 	//f = list_remove(e);
 	t = list_entry(e, struct thread, elem);
+	//printf("list entry");
 	sema_up(&t->sema);
-	//e = f;
 	f = list_remove(e);
-	e=f;
+	e = f;
+	//printf("semaphore up");
+	//list_remove(&t->elem);
+	//e=f;
      }
      else break;
   }
