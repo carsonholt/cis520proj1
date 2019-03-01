@@ -220,8 +220,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
      if (t->wakeup <= timer_ticks())
      {
 	t = list_entry(e, struct thread, elem);
-	//sema_up(&t->sema);
 	f = list_remove(e);
+	intr_set_level(old_level);
 	sema_up(&t->sema);
 	e = f;
 	return;

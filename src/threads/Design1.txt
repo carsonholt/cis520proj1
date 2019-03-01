@@ -63,7 +63,9 @@ Ahmed Alhkraissi <aalkhraissi@k-state.edu>
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> other designs that you considered?
-   I chose the design with semaphores because...
+   I chose the design with semaphores because a) semaphores can be used
+   more widely than locks and b) semaphores are safer than calling
+   thread_block() and thread_unblock() directly
 
 
              PRIORITY SCHEDULING
