@@ -31,6 +31,14 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+  /* My code begins here
+   * split up the file name */
+  char *fn, *save;
+  struct thread *t;
+
+  tid = TID_ERROR;
+  /* My code ends here */
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -38,8 +46,33 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  /* My code begins here */
+  fn = malloc(strlen(file_name)+1);
+  if (!fn) 
+    goto done;
+  memcpy(fn, file_name, strlen(file_name) + 1);
+  file_name = strtok_r(fn, "", &save);
+  /* == My code ends here */
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  // old code: tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  /* My code */
+  tid = thread_create(fn, PRI_DEFAULT, start_process, fn_copy);
+  if (tid == TID_ERROR)
+    goto done;
+  /* wait for child thread to load */
+  t = get_thread_by_tid(tid);
+  sema_down(&t->wait);
+  if (t->ret_status == -1)
+    tid = TID_ERROR;
+  while (t->status == THREAD_BLOCKED)
+    thread_unblock(t);
+  if (t->ret_status == -1)
+    process_wait(t->tid);
+
+done:
+  free(fn);
+  /* My code ends here */
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
