@@ -57,7 +57,7 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. */
   // old code: tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   /* My code */
-  tid = thread_create(fn, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     goto done;
   /* wait for child thread to load */
@@ -87,17 +87,88 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  /* My implementation */
+  
+
+  /* == My impelementation ends */
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+  /* My implementation */
+  t = thread_current();
+  argc = 0;
+  argv_off = malloc (32 * sizeof(int));
+  if (!argv_off)
+    goto exit;
+  file_name_len = strlen(file_name);
+  argv_off[0] = 0;
+  for (
+	token = strtok_r(file_name, "", &save_ptr);
+	token != NULL;
+	token = strtok_r(NULL, "", &save_ptr);
+      )
+       {
+	while (*(save_ptr) == ')
+	  ++save_ptr;
+	 argv_off[++argc] = save_ptr - file_name;
+       }
+  /* == My implementation */
+
   success = load (file_name, &if_.eip, &if_.esp);
+
+  /* My implementation */
+  /* Setting up stack */
+  if (success)
+  {
+    t->self = filesys_open(file_name);
+    file_deny_write(t->self);
+    if_.esp -= file_name_len + 1;
+    start = if_.esp;
+    memcpy(if_.esp, file_name. file_name_len + 1);
+    if_.esp -= 4 - (file_name_len + 1) % 4;
+    if_.esp -= 4;
+    *(int *)(if_.esp) = 0;
+
+    for (i = argc - 1; i >= 0; --i)
+      {
+	if_.esp -= 4;
+	*(void **)(if_.esp) = start + argc_off[i];
+      }
+
+    if_.esp -= 4;
+    *(char **)(if_.esp) = (if_.esp + 4);
+    if_.esp -= 4;
+    *(int *)(if_.esp) = argc;
+    if_.esp -= 4;
+    *(int *)(if_.esp) = 0;
+
+    sema_up(&t->wait);
+    intr_disable();
+    thread_block();
+    intr_enable();
+  }
+  else 
+  {
+    free(argv_off);
+ exit:
+    t->ret_status = -1;
+    sema_up(&t->wait);
+    intr_disable();
+    thread_block();
+    intr_enable();
+    thread_exit();
+  }
+
+  free(argv_off);
+  /* == My implementation */
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  /* Old implementation if (!success) 
+    thread_exit (); */
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
