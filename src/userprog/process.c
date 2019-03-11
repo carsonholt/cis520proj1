@@ -17,6 +17,10 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+/* My code */
+#include "threads/malloc.h"
+#include "userprog/syscall.h"
+/* == My code */
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -87,17 +91,22 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  /* My implementation */
-  
+  /* My code  */
+  char *token, *save_ptr;
+  void *start;
+  int argc, i;
+  int *argv_off;
+  size_t file_name_len;
+  struct thread *t;
+  /* == My code ends */
 
-  /* == My impelementation ends */
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  /* My implementation */
+  /* My code */
   t = thread_current();
   argc = 0;
   argv_off = malloc (32 * sizeof(int));
@@ -106,20 +115,21 @@ start_process (void *file_name_)
   file_name_len = strlen(file_name);
   argv_off[0] = 0;
   for (
-	token = strtok_r(file_name, "", &save_ptr);
+	token = strtok_r(file_name, " ", &save_ptr);
 	token != NULL;
-	token = strtok_r(NULL, "", &save_ptr);
+	token = strtok_r(NULL, " ", &save_ptr)
       )
        {
-	while (*(save_ptr) == ')
+	while (*(save_ptr) == ' ') {
 	  ++save_ptr;
 	 argv_off[++argc] = save_ptr - file_name;
+	}
        }
-  /* == My implementation */
+  /* == My code */
 
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* My implementation */
+  /* My code */
   /* Setting up stack */
   if (success)
   {
@@ -127,7 +137,7 @@ start_process (void *file_name_)
     file_deny_write(t->self);
     if_.esp -= file_name_len + 1;
     start = if_.esp;
-    memcpy(if_.esp, file_name. file_name_len + 1);
+    memcpy(if_.esp, file_name, file_name_len + 1);
     if_.esp -= 4 - (file_name_len + 1) % 4;
     if_.esp -= 4;
     *(int *)(if_.esp) = 0;
@@ -135,7 +145,7 @@ start_process (void *file_name_)
     for (i = argc - 1; i >= 0; --i)
       {
 	if_.esp -= 4;
-	*(void **)(if_.esp) = start + argc_off[i];
+	*(void **)(if_.esp) = start + argv_off[i];
       }
 
     if_.esp -= 4;
@@ -163,7 +173,7 @@ start_process (void *file_name_)
   }
 
   free(argv_off);
-  /* == My implementation */
+  /* == My code */
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -192,7 +202,32 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  /* Old code  
+return -1; */
+  
+  /* My code */
+  struct thread *t;
+  int ret;
+
+  ret = -1;
+  t = get_thread_by_tid(child_tid);
+  if (!t || t->status == THREAD_DYING || t->ret_status == RET_STATUS_INVALID)
+    goto done;
+  if (t->ret_status != RET_STATUS_DEFAULT && t->ret_status != RET_STATUS_INVALID) {
+    ret = t->status;
+    goto done;
+  }
+
+  sema_down(&t->sema);
+  ret = t->ret_status;
+  
+  while (t->status == THREAD_BLOCKED)
+    thread_unblock(t);
+
+done:
+  t->status = RET_STATUS_INVALID;
+  return ret;
+  /* My code ends here */
 }
 
 /* Free the current process's resources. */
@@ -201,6 +236,20 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  
+  /* My code */
+  while (!list_empty(&cur->wait.waiters))
+    sema_up(&cur->wait);
+  file_close(cur->self);
+  cur->self = NULL;
+  cur->exited = true;
+  if (cur->parent)
+  {
+    intr_disable();
+    thread_block();
+    intr_enable();
+  }
+  /* My code ends here */
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

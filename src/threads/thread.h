@@ -24,6 +24,13 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* My code */
+#ifdef USERPROG
+#define RET_STATUS_DEFAULT 0xcdcdcdcd
+#define RET_STATUS_INVALID 0xdcdcdcdc
+#endif
+/* My code */
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -98,7 +105,7 @@ struct thread
      * For the wakeup time
      */
     struct semaphore sema; //empty semaphore
-
+    //int ret_status; /* return status */
     int64_t wakeup;
 
     /*
@@ -133,6 +140,17 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+
+    /* My code */
+    struct semaphore wait; /* semaphore for proecss_wait*/
+    int ret_status; /* return status */
+    struct list files; /* all opened filese */
+    struct file *self; /* the image file on the disk */
+    struct thread *parent; /* parent process */
+    struct list children; /* all children process */
+    struct list_elem children_elem; /* in children list*/
+    bool exited; /* whether the thread exited or not */
+    /* == My code */
 #endif
 
     /* Owned by thread.c. */
