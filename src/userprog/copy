@@ -37,7 +37,6 @@ static int sys_mmap(int handle, void *addr);
 static int sys_munmap(int mapping);
 static void syscall_handler (struct intr_frame *);
 
-static void copy_in(void *, const void *, size_t);
 static struct file *find_file_by_fd(int fd);
 static struct fd_elem *find_fd_elem_by_fd(int fd);
 static int alloc_fid(void);
@@ -45,6 +44,8 @@ static struct fd_elem *find_fd_elem_by_fd_in_process(int fd);
 
 typedef int (*handler) (uint32_t, uint32_t, uint32_t);
 static handler syscall_vec[128];
+static void copy_in(void *, const void *, size_t);
+
 static struct lock fs_lock;
 
 struct fd_elem
@@ -117,7 +118,7 @@ syscall_handler (struct intr_frame *f)
   /* Old implementation 
   printf ("system call!\n");
   thread_exit (); */
- /* handler h;
+  handler h;
   int *p;
   int ret;
 
@@ -137,68 +138,48 @@ syscall_handler (struct intr_frame *f)
 
   f->eax = ret;
 
-  return;*/
-  const struct syscall *sc;
-  unsigned call_nr;
-  int args[3];
+  return;
 
-  /* Get the system call. */
-  copy_in (&call_nr, f->esp, sizeof call_nr);
-  if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
-    thread_exit ();
-  sc = syscall_table + call_nr;
-
-  /* Get the system call arguments. */
-  ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
-  memset (args, 0, sizeof args);
-  copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
-
-  /* Execute the system call,
-     and set the return value. */
-  f->eax = sc->func (args[0], args[1], args[2]);
-
-/*terminate:
-  sys_exit(-1);*/
+terminate:
+  sys_exit(-1);
   /* == My implementation */
 }
 
-/* Returns true if UADDR is valid, false otherwise */
-static bool verify_user(const void *uaddr)
-{
-  return (uaddr < PHYS_BASE 
-	  && pagedir_get_page (thread_current()->pagedir, uaddr) != NULL);
-}
-
-/* copes a byte from usrc to kernel address. */
-static inline bool get_user (uint8_t *dst, const uint8_t *usrc)
-{
-  int eax;
-  asm ("movl $1f, %%eax; movb %2, %%al; movb %%al, %0; 1:"
-       : "=m" (*dst), "=&a" (eax) : "m" (*usrc));
-  return eax != 0;
-}
-
-/* Writes BYTE to user address UDST */
-static inline bool put_user (uint8_t *udst, uint8_t byte)
-{
-  int eax;
-  asm ("movl $1f, %%eax; movb %b2, %0; 1:"
-       : "=m" (*udst), "=&a" (eax) : "q" (byte));
-  return eax != 0;
-}
-
-/* copies SIZE bytes from user address USRC to kernel address DST */
+/* Copes from user address usrc to kernel address dst */
 static void copy_in (void *dst_, const void *usrc_, size_t size)
 {
   uint8_t *dst = dst_;
   const uint8_t *usrc = usrc_;
 
   for (; size > 0; size--, dst++, usrc++)
+    if (usrc >= (uint8_t *) PHYS_BASE || !get_user (dst, usrc))
+      thread_exit ();
+}
+
+/* create a copy of user string us in kernel memory */
+static_char * copy_in_string (const char *us)
+{
+  char *ks;
+  char *upage;
+  size_t length;
+
+  ks = palloc_get_page(0);
+  if (ks == NULL)
+    thread_exit();
+
+  for (length = 0; length < PGSIZE; length++)
+  {
+    if (us >= (char *) PHYS_BASE || !get_user (ks + length, us++))
     {
-      //size_t chunk_size = PGSIZE - pg_ofs (usrc);
-      if (usrc >= (uint8_t *) PHYS_BASE || !get_user(dst,usrc))
-        thread_exit();
+      palloc_free_page(ks);
+      thread_exit();
     }
+
+    if (ks[length] == '\0')
+      return ks;
+  }
+
+  ks[PGSIZE - 1] = '\0';
 }
 
 /* A file descriptor which binds a file handle to a file */
@@ -208,25 +189,6 @@ struct file_descriptor
   struct file *file;
   int handle;
 };
-
-/* Look up by handle and return file descriptor */
-static struct file_descriptor *
-lookup_fd (int handle)
-{
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
-
-  for (e = list_begin (&cur->fds); e != list_end (&cur->fds);
-       e = list_next (e))
-    {
-      struct file_descriptor *fd;
-      fd = list_entry (e, struct file_descriptor, elem);
-      if (fd->handle == handle)
-        return fd;
-    }
-
-  thread_exit ();
-}
 
 static int sys_write
 (int handle, void *usrc_, unsigned size)
@@ -327,56 +289,6 @@ int sys_exit(int exit_code) {
   NOT_REACHED();
 }
 
-/* Creates a copy of user string US in kernel memory
-   and returns it as a page that must be freed with
-   palloc_free_page().
-   Truncates the string at PGSIZE bytes in size.
-   Call thread_exit() if any of the user accesses are invalid. */
-static char *
-copy_in_string (const char *us)
-{
-  char *ks;
-  //char *upage;
-  size_t length;
-
-  ks = palloc_get_page (0);
-  if (ks == NULL)
-    thread_exit ();
-
-  //length = 0;
-  for (length = 0; length < PGSIZE; length++)
-    {
-      /*upage = pg_round_down (us);
-      if (!page_lock (upage, false))
-        goto lock_error;
-
-      for (; us < upage + PGSIZE; us++)
-        {
-          ks[length++] = *us;
-          if (*us == '\0')
-            {
-              page_unlock (upage);
-              return ks;
-            }
-          else if (length >= PGSIZE)
-            goto too_long_error;
-        }
-
-      page_unlock (upage);*/
-      if (us >= (char *) PHYS_BASE || !get_user(ks + length, us++))
-      {
-	palloc_free_page(ks);
-	thread_exit();
-      }
-
-      if (ks[length] == '\0')
-	return ks;
-    }
-
-  ks[PGSIZE - 1] = '\0';
-  return ks;
-}
-
 static int sys_halt(void)
 {
 	shutdown_power_off();
@@ -470,7 +382,7 @@ static int sys_close(int handle)
   return 0;
 }
 
-static int sys_read(int handle, void *udst_, unsigned size)
+static sys_read(int handle, void *udst_, unsigned size)
 {
   /*struct file *f;
   unsigned i;
@@ -513,50 +425,26 @@ static int sys_read(int handle, void *udst_, unsigned size)
     // Read from file to page
     if (handle != STDIN_FILENO)
     {
-      fd = lookup_fd(handle);
+      if (!page_lock(udst, true))
+	thread_exit();
       lock_acquire(&fs_lock);
-
-      while (size > 0)
-      {
-	size_t page_left = PGSIZE - pg_ofs(udst);
-	size_t read_amt = size < page_left ? size : page_left;
-	off_t retval;
-
-	if (!verify_user(udst))
-	{
-	  lock_release(&fs_lock);
-	  thread_exit();
-	}
-
-	// read from file to page
-	retval = file_read(fd->file, udst, read_amt);
-	if (retval < 0)
-	{
-	  if (bytes_read == 0) {
-	    bytes_read = -1;
-	  }
-	  break;
-	}
-
-	bytes_read += retval;
-
-	if (retval != (off_t) read_amt) {
-	  break;
-	}
-
-	udst += retval;
-	size -= retval;
-      }
+      retval = file_read(fd->file, udst, read_amt);
       lock_release(&fs_lock);
+      page_unlock(udst);
     }
     else 
     {
-      for (bytes_read = 0; bytes_read < size; bytes_read++)
+      size_t i;
+
+      for (i = 0; i < read_amt; i++)
       {
-	if (udst >= (uint8_t *) PHYS_BASE || !put_user(udst++, input_getc()))
+	char c = input_getc();
+	if (!page_lock(udst, true))
 	  thread_exit();
+	udst[i] = c;
+	page_unlock(udst);
       }
-      return bytes_read;
+      bytes_read = read_amt;
     }
 
     if (retval < 0)

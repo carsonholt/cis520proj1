@@ -97,6 +97,8 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    int exit_code;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -152,6 +154,12 @@ struct thread
     bool exited; /* whether the thread exited or not */
     /* == My code */
 #endif
+
+    /* Owned by syscall.c */
+    struct list fds;
+    struct list mappings;
+    int next_handle;
+    void *user_esp;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
